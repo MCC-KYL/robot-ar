@@ -1,0 +1,142 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+
+  <title>IBVS Robot GIF AR</title>
+
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    #instructions {
+      position: fixed;
+      z-index: 10;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      border-radius: 8px;
+      text-align: center;
+    }
+  </style>
+
+  <script>
+    AFRAME.registerComponent("gif-texture", {
+      schema: { src: { type: "selector" } },
+
+      init: function () {
+        this.gif = this.data.src;
+        this.canvas = document.createElement("canvas");
+        this.ctx = this.canvas.getContext("2d");
+        this.texture = null;
+        this.materialReady = false;
+
+        this.onImageLoad = () => {
+          this.canvas.width = this.gif.naturalWidth;
+          this.canvas.height = this.gif.naturalHeight;
+
+          this.texture = new THREE.CanvasTexture(this.canvas);
+          this.texture.colorSpace = THREE.SRGBColorSpace;
+
+          this.el.addEventListener("object3dset", () => {
+            this.applyTexture();
+          });
+
+          this.applyTexture();
+        };
+
+        if (this.gif.complete && this.gif.naturalWidth) {
+          this.onImageLoad();
+        } else {
+          this.gif.addEventListener("load", this.onImageLoad);
+        }
+      },
+
+      applyTexture: function () {
+        const mesh = this.el.getObject3D("mesh");
+
+        if (!mesh || !this.texture) return;
+
+        mesh.material.map = this.texture;
+        mesh.material.needsUpdate = true;
+        this.materialReady = true;
+      },
+
+      tick: function () {
+        if (!this.texture || !this.materialReady) {
+          this.applyTexture();
+          return;
+        }
+
+        // Draw the GIF's currently displayed animation frame.
+        this.ctx.clearRect(
+          0, 0, this.canvas.width, this.canvas.height
+        );
+
+        this.ctx.drawImage(
+          this.gif, 0, 0,
+          this.canvas.width, this.canvas.height
+        );
+
+        this.texture.needsUpdate = true;
+      },
+
+      remove: function () {
+        if (this.texture) this.texture.dispose();
+
+        if (this.gif && this.onImageLoad) {
+          this.gif.removeEventListener("load", this.onImageLoad);
+        }
+      }
+    });
+  </script>
+</head>
+
+<body>
+  <div id="instructions">
+    Point your camera at the selected figure on your poster.
+  </div>
+
+  <a-scene
+    mindar-image="imageTargetSrc: ./approach.mind;"
+    color-space="sRGB"
+    renderer="colorManagement: true"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false">
+
+    <a-assets>
+      <img id="robotGif"
+           src="./Approach.gif"
+           crossorigin="anonymous">
+    </a-assets>
+
+    <a-camera
+      position="0 0 0"
+      look-controls="enabled: false">
+    </a-camera>
+
+    <a-entity mindar-image-target="targetIndex: 0">
+
+      <a-plane
+        position="0 0 0.05"
+        width="0.8"
+        height="0.45"
+        material="shader: flat; transparent: true"
+        gif-texture="src: #robotGif">
+      </a-plane>
+
+    </a-entity>
+  </a-scene>
+</body>
+</html>
