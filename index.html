@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -22,15 +21,11 @@
 
     html,
     body {
-      position: fixed;
-      inset: 0;
       width: 100%;
       height: 100%;
-      height: 100dvh;
       margin: 0;
       padding: 0;
       overflow: hidden;
-      background: #000;
       overscroll-behavior: none;
     }
 
@@ -44,30 +39,6 @@
       margin: 0 !important;
       padding: 0 !important;
       overflow: hidden !important;
-    }
-
-    /* Full-screen AR rendering canvas. */
-    a-scene canvas,
-    canvas.a-canvas {
-      position: fixed !important;
-      inset: 0 !important;
-      display: block !important;
-      width: 100% !important;
-      height: 100% !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-
-    /* Full-screen camera feed supplied by MindAR. */
-    video.mindar-video {
-      position: fixed !important;
-      inset: 0 !important;
-      display: block !important;
-      width: 100% !important;
-      height: 100% !important;
-      object-fit: cover !important;
-      margin: 0 !important;
-      padding: 0 !important;
     }
 
     /* Keep MindAR's camera/scanning UI over the camera feed. */
@@ -294,4 +265,3 @@
   </script>
 </body>
 </html>
-```
