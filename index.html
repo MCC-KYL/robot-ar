@@ -3,13 +3,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1">
-
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>IBVS Robot GIF AR</title>
 
+  <!-- A-Frame and MindAR -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <!-- Animated GIF decoder -->
+  <script src="https://unpkg.com/gifler@0.1.0/gifler.min.js"></script>
 
   <style>
     body {
@@ -28,76 +30,182 @@
       color: white;
       border-radius: 8px;
       text-align: center;
+      box-sizing: border-box;
+    }
+
+    #status {
+      display: block;
+      margin-top: 5px;
+      font-size: 13px;
+      opacity: 0.9;
     }
   </style>
 
   <script>
     AFRAME.registerComponent("gif-texture", {
-      schema: { src: { type: "selector" } },
+      schema: {
+        src: { type: "selector" }
+      },
 
       init: function () {
-        this.gif = this.data.src;
         this.canvas = document.createElement("canvas");
-        this.ctx = this.canvas.getContext("2d");
         this.texture = null;
-        this.materialReady = false;
+        this.animation = null;
+        this.started = false;
+        this.frameReady = false;
 
-        this.onImageLoad = () => {
-          this.canvas.width = this.gif.naturalWidth;
-          this.canvas.height = this.gif.naturalHeight;
+        this.startGif = () => {
+          const img = this.data.src;
+
+          if (
+            this.started ||
+            !img ||
+            !img.naturalWidth ||
+            !img.naturalHeight
+          ) {
+            return;
+          }
+
+          this.started = true;
+
+          this.canvas.width = img.naturalWidth;
+          this.canvas.height = img.naturalHeight;
 
           this.texture = new THREE.CanvasTexture(this.canvas);
           this.texture.colorSpace = THREE.SRGBColorSpace;
+          this.texture.needsUpdate = true;
 
-          this.el.addEventListener("object3dset", () => {
-            this.applyTexture();
-          });
+          try {
+            gifler(img.src).get((animator) => {
+              this.animation = animator;
 
-          this.applyTexture();
+              // Decode the animated GIF and draw its frames
+              // onto the canvas.
+              animator.animateInCanvas(this.canvas);
+
+              this.frameReady = true;
+              this.applyTexture();
+
+              const status = document.getElementById("status");
+              if (status) {
+                status.textContent = "GIF loaded. Scan your poster figure.";
+              }
+            });
+          } catch (error) {
+            console.error("Could not start GIF animation:", error);
+
+            const status = document.getElementById("status");
+            if (status) {
+              status.textContent = "Could not start the GIF animation.";
+            }
+          }
         };
 
-        if (this.gif.complete && this.gif.naturalWidth) {
-          this.onImageLoad();
+        this.onGifError = () => {
+          const status = document.getElementById("status");
+          if (status) {
+            status.textContent =
+              "Could not load Approach.gif. Check the file.";
+          }
+        };
+
+        const img = this.data.src;
+
+        if (img) {
+          img.addEventListener("load", this.startGif);
+          img.addEventListener("error", this.onGifError);
+
+          if (img.complete && img.naturalWidth > 0) {
+            this.startGif();
+          }
         } else {
-          this.gif.addEventListener("load", this.onImageLoad);
+          console.error("GIF image selector was not found.");
         }
       },
 
       applyTexture: function () {
+        if (!this.texture) return;
+
         const mesh = this.el.getObject3D("mesh");
+        if (!mesh || !mesh.material) return;
 
-        if (!mesh || !this.texture) return;
+        // Support both single and multi-material meshes.
+        const materials = Array.isArray(mesh.material)
+          ? mesh.material
+          : [mesh.material];
 
-        mesh.material.map = this.texture;
-        mesh.material.needsUpdate = true;
-        this.materialReady = true;
+        materials.forEach((material) => {
+          material.map = this.texture;
+          material.needsUpdate = true;
+        });
       },
 
       tick: function () {
-        if (!this.texture || !this.materialReady) {
-          this.applyTexture();
-          return;
-        }
+        if (!this.texture) return;
 
-        // Draw the GIF's currently displayed animation frame.
-        this.ctx.clearRect(
-          0, 0, this.canvas.width, this.canvas.height
-        );
-
-        this.ctx.drawImage(
-          this.gif, 0, 0,
-          this.canvas.width, this.canvas.height
-        );
-
+        // Update the Three.js texture with the latest canvas frame.
         this.texture.needsUpdate = true;
+
+        // The mesh may become available after this component starts.
+        this.applyTexture();
       },
 
       remove: function () {
-        if (this.texture) this.texture.dispose();
+        const img = this.data.src;
 
-        if (this.gif && this.onImageLoad) {
-          this.gif.removeEventListener("load", this.onImageLoad);
+        if (img) {
+          img.removeEventListener("load", this.startGif);
+          img.removeEventListener("error", this.onGifError);
         }
+
+        if (this.animation && this.animation.stop) {
+          this.animation.stop();
+        }
+
+        if (this.texture) {
+          this.texture.dispose();
+        }
+      }
+    });
+
+    window.addEventListener("load", () => {
+      const status = document.getElementById("status");
+
+      // Check that the tracking target can be retrieved.
+      fetch("./approach.mind", { method: "HEAD" })
+        .then((response) => {
+          if (!response.ok && status) {
+            status.textContent =
+              "Tracking file not found: approach.mind";
+          }
+        })
+        .catch((error) => {
+          console.warn("Could not check tracking file:", error);
+        });
+    });
+
+    // Report scene loading errors in the browser console.
+    document.addEventListener("DOMContentLoaded", () => {
+      const scene = document.querySelector("a-scene");
+
+      if (scene) {
+        scene.addEventListener("arReady", () => {
+          const status = document.getElementById("status");
+          if (status) {
+            status.textContent =
+              "Camera ready. Point it at your poster figure.";
+          }
+        });
+
+        scene.addEventListener("arError", (event) => {
+          console.error("AR initialisation error:", event);
+
+          const status = document.getElementById("status");
+          if (status) {
+            status.textContent =
+              "AR failed to initialise. Check camera permission.";
+          }
+        });
       }
     });
   </script>
@@ -106,19 +214,21 @@
 <body>
   <div id="instructions">
     Point your camera at the selected figure on your poster.
+    <span id="status">Loading AR experience...</span>
   </div>
 
   <a-scene
     mindar-image="imageTargetSrc: ./approach.mind;"
     color-space="sRGB"
-    renderer="colorManagement: true"
+    renderer="colorManagement: true; antialias: true"
     vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false">
 
-    <a-assets>
-      <img id="robotGif"
-           src="./Approach.gif"
-           crossorigin="anonymous">
+    <a-assets timeout="15000">
+      <img
+        id="robotGif"
+        src="./Approach.gif"
+        crossorigin="anonymous">
     </a-assets>
 
     <a-camera
@@ -127,16 +237,15 @@
     </a-camera>
 
     <a-entity mindar-image-target="targetIndex: 0">
-
       <a-plane
         position="0 0 0.05"
         width="0.8"
         height="0.45"
-        material="shader: flat; transparent: true"
+        material="shader: flat; transparent: true; side: double"
         gif-texture="src: #robotGif">
       </a-plane>
-
     </a-entity>
+
   </a-scene>
 </body>
 </html>
