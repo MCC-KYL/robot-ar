@@ -43,6 +43,11 @@ The page's image and animation files are present beside `index.html`.
   texture component.
 - A-Frame 1.5.0, MindAR 1.2.5, and gifler 0.1.0 are loaded from CDNs, so the
   page needs an internet connection.
+- MindAR's One Euro filter is tuned to reduce pose jitter while retaining
+  responsiveness, and tracking tolerates a few missed frames to reduce
+  flickering.
+- GIF textures are refreshed only when Gifler draws a new frame, avoiding
+  redundant GPU texture uploads between animation frames.
 - The status message reports camera startup and target detection. If the camera
   does not start, check browser camera permissions and serve the page from a
   secure context.

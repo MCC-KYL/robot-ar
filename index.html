@@ -84,8 +84,6 @@
         canvas.width = 512;
         canvas.height = 512;
 
-        const context = canvas.getContext("2d");
-
         const texture = new THREE.CanvasTexture(canvas);
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
@@ -113,6 +111,10 @@
           this.animationStarted = true;
 
           gifler(image.src).get((animation) => {
+            animation.onDrawFrame = (context, frame) => {
+              context.drawImage(frame.buffer, frame.x, frame.y);
+              texture.needsUpdate = true;
+            };
             animation.animateInCanvas(canvas);
           });
         };
@@ -127,13 +129,6 @@
           image.addEventListener("error", () => {
             console.error("Could not load GIF:", image.src);
           }, { once: true });
-        }
-      },
-
-      tick: function () {
-        // Refresh the animated GIF texture on each render frame.
-        if (this.texture) {
-          this.texture.needsUpdate = true;
         }
       },
 
@@ -172,7 +167,7 @@
     The scene should occupy the full viewport.
   -->
   <a-scene
-    mindar-image="imageTargetSrc: ./targets.mind; autoStart: false;"
+    mindar-image="imageTargetSrc: ./targets.mind; autoStart: false; filterMinCF: 0.0005; filterBeta: 500; missTolerance: 8;"
     color-space="sRGB"
     renderer="colorManagement: true"
     vr-mode-ui="enabled: false"
